@@ -17,6 +17,17 @@ The answer page is designed for on-device reading:
 - larger type
 - scrollable long-form response
 
+## Screenshots
+
+Selection and launch flow:
+
+<img src="images/screen_004.png" alt="Ask LLM menu action on Kobo" width="420" />
+
+Generated answer view:
+
+<img src="images/screen_005.png" alt="Formatted AI answer on Kobo" width="320" />
+<img src="images/screen_006.png" alt="Long-form explanation view on Kobo" width="320" />
+
 ## What This Project Contains
 
 This repository mirrors the files that live on the Kobo:
@@ -166,6 +177,8 @@ The selected passage is injected where the template contains:
 ```text
 {{SELECTED_TEXT}}
 ```
+
+For the current shell implementation, keep `{{SELECTED_TEXT}}` on its own line for the most reliable rendering.
 
 You can customize the behavior by editing that template file directly.
 

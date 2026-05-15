@@ -66,6 +66,13 @@ html_escape_sh() {
   sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
 }
 
+render_prompt_template() {
+  awk -v selection="$SELECTION_TEXT" '{
+    gsub(/\{\{SELECTED_TEXT\}\}/, selection)
+    print
+  }' "$PROMPT_TEMPLATE_PATH" >"$PROMPT_FILE"
+}
+
 write_loading_html() {
   if [ -f "$STATUS_FILE" ]; then
     STATUS_HTML="$(html_escape_sh <"$STATUS_FILE")"
@@ -128,6 +135,7 @@ write_loading_html
 
 if [ ! -f "$CONFIG" ]; then
   log_err "config.env not found at $CONFIG"
+  set_status "Error: config.env not found."
   exit 1
 fi
 
@@ -147,11 +155,13 @@ fi
 
 if [ -z "$OPENAI_API_KEY" ]; then
   log_err "OPENAI_API_KEY is empty in config.env"
+  set_status "Error: OPENAI_API_KEY is empty."
   exit 1
 fi
 
 if [ -z "$SELECTION_TEXT" ]; then
   log_err "No selected text was received from Kobo."
+  set_status "Error: no selected text was received."
   exit 1
 fi
 
@@ -171,16 +181,19 @@ if [ -z "$CURL_BIN" ]; then
   log_err "curl not found on Kobo."
   log_err "PATH is: $PATH"
   log_err "Checked bundled path: $BUNDLED_BIN_DIR/curl"
+  set_status "Error: curl not found on Kobo."
   exit 1
 fi
 
 if [ ! -f "$CACERT_FILE" ]; then
   log_err "CA bundle not found at $CACERT_FILE"
+  set_status "Error: CA bundle not found."
   exit 1
 fi
 
 if [ ! -f "$PROMPT_TEMPLATE_PATH" ]; then
   log_err "Prompt template not found at $PROMPT_TEMPLATE_PATH"
+  set_status "Error: prompt template not found."
   exit 1
 fi
 
@@ -197,7 +210,7 @@ import sys
 print(html.escape(sys.stdin.read()), end="")
 PY
 
-sed "s|{{SELECTED_TEXT}}|$SELECTION_TEXT|g" "$PROMPT_TEMPLATE_PATH" >"$PROMPT_FILE"
+render_prompt_template
 log_msg "Wrote prompt to $PROMPT_FILE"
 
 if command -v python3 >/dev/null 2>&1; then
@@ -232,6 +245,7 @@ fi
 log_msg "JSON creation exit status: $JSON_STATUS"
 if [ "$JSON_STATUS" -ne 0 ]; then
   log_err "Failed to create request JSON."
+  set_status "Error: failed to create request JSON."
   exit 1
 fi
 
@@ -268,6 +282,7 @@ if [ "$CURL_STATUS" -ne 0 ]; then
       log_err "$line"
     done <"$CURL_ERR_FILE"
   fi
+  set_status "Error: OpenAI request failed."
   exit 1
 fi
 
@@ -279,6 +294,7 @@ case "$HTTP_CODE" in
     log_err "OpenAI API returned HTTP $HTTP_CODE."
     log_msg "Response body:"
     sed -n '1,80p' "$RAW_FILE" >>"$LOG"
+    set_status "Error: OpenAI API returned HTTP $HTTP_CODE."
     exit 1
     ;;
 esac
@@ -327,6 +343,7 @@ fi
 log_msg "Response parse exit status: $RESPONSE_PARSE_STATUS"
 if [ "$RESPONSE_PARSE_STATUS" -ne 0 ] || [ ! -s "$RESPONSE_TEXT_FILE" ]; then
   log_err "Could not extract clean response text."
+  set_status "Error: could not extract response text."
   exit 1
 fi
 
@@ -371,6 +388,7 @@ ANSWER_STATUS=$?
 log_msg "HTML write exit status: $ANSWER_STATUS"
 if [ "$ANSWER_STATUS" -ne 0 ]; then
   log_err "Failed to write HTML answer."
+  set_status "Error: failed to write HTML answer."
   exit 1
 fi
 
