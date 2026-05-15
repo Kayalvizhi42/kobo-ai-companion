@@ -28,7 +28,7 @@ Generated answer view:
 <table>
   <tr>
     <td><img src="images/screen_005.png" alt="Formatted AI answer on Kobo" width="320" /></td>
-    <td><img src="images/screen_006.png" alt="Long-form explanation view on Kobo" width="320" /></td>
+    <td><img src="images/screen_002.png" alt="Long-form explanation view on Kobo" width="320" /></td>
   </tr>
 </table>
 

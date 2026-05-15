@@ -207,7 +207,9 @@ cat >"$ESCAPE_HTML_PY" <<'PY'
 import html
 import sys
 
-print(html.escape(sys.stdin.read()), end="")
+# We render into <pre> text nodes, so quotes do not need escaping.
+# Keeping quote=False avoids Kobo showing apostrophe entities like &#x27;.
+print(html.escape(sys.stdin.read(), quote=False), end="")
 PY
 
 render_prompt_template
