@@ -1,2 +1,4 @@
+menu_item :main    :Test NickelMenu    :dbg_toast    :NickelMenu works
+menu_item :main    :Ask AI Test    :cmd_spawn    :quiet:/mnt/onboard/.adds/ai/ask_ai.sh
 menu_item :selection    :Ask LLM    :cmd_spawn    :quiet:/mnt/onboard/.adds/ai/start_ai_selection.sh '{1||$}'
-  chain_success    :nickel_browser    :modal:file:///mnt/onboard/ai_answers/latest_ai_answer.html
+  chain_success    :nickel_browser    :modal:file:///mnt/onboard/.adds/ai/output/latest_ai_answer.html

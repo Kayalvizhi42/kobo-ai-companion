@@ -1,7 +1,7 @@
 #!/bin/sh
 
-ANSWER_FILE="/mnt/onboard/ai_answers/latest_ai_answer.html"
-OUT_DIR="/mnt/onboard/ai_answers"
+ANSWER_FILE="/mnt/onboard/.adds/ai/output/latest_ai_answer.html"
+OUT_DIR="/mnt/onboard/.adds/ai/output"
 SCRIPT="/mnt/onboard/.adds/ai/ask_ai_selection.sh"
 SELECTION_TEXT="$1"
 

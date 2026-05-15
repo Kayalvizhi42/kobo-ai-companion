@@ -25,8 +25,12 @@ Selection and launch flow:
 
 Generated answer view:
 
-<img src="images/screen_005.png" alt="Formatted AI answer on Kobo" width="320" />
-<img src="images/screen_006.png" alt="Long-form explanation view on Kobo" width="320" />
+<table>
+  <tr>
+    <td><img src="images/screen_005.png" alt="Formatted AI answer on Kobo" width="320" /></td>
+    <td><img src="images/screen_006.png" alt="Long-form explanation view on Kobo" width="320" /></td>
+  </tr>
+</table>
 
 ## What This Project Contains
 
@@ -35,10 +39,11 @@ This repository mirrors the files that live on the Kobo:
 ```text
 .adds/
   ai/
+    ask_ai.sh
     ask_ai_selection.sh
     start_ai_selection.sh
     config.env.example
-    prompt_template.txt
+    prompt_template.tmpl
   bin/
     curl
   certs/
@@ -49,13 +54,15 @@ This repository mirrors the files that live on the Kobo:
 
 What each file does:
 
+- `.adds/ai/ask_ai.sh`
+  Small database test helper that writes the latest highlight text to a log file under `.adds/ai/output/`.
 - `.adds/ai/ask_ai_selection.sh`
   Main script. Builds the prompt, calls OpenAI, logs activity, and writes the final HTML answer.
 - `.adds/ai/start_ai_selection.sh`
   Small wrapper that creates the loading page first, then launches the background AI request.
 - `.adds/ai/config.env.example`
   Template for your API key and model selection.
-- `.adds/ai/prompt_template.txt`
+- `.adds/ai/prompt_template.tmpl`
   Editable prompt template used to shape the explanation.
 - `.adds/bin/curl`
   Bundled static ARM `curl` binary used by Kobo.
@@ -129,8 +136,10 @@ The root of the mounted device is typically something like:
 Copy this repo’s `.adds` contents onto the Kobo so the device ends up with:
 
 ```text
+/mnt/onboard/.adds/ai/ask_ai.sh
 /mnt/onboard/.adds/ai/ask_ai_selection.sh
 /mnt/onboard/.adds/ai/start_ai_selection.sh
+/mnt/onboard/.adds/ai/prompt_template.tmpl
 /mnt/onboard/.adds/ai/config.env
 /mnt/onboard/.adds/bin/curl
 /mnt/onboard/.adds/certs/cacert.pem
@@ -139,11 +148,13 @@ Copy this repo’s `.adds` contents onto the Kobo so the device ends up with:
 
 Practical copy steps:
 
-1. Copy `.adds/ai/ask_ai_selection.sh` to `KOBOeReader/.adds/ai/`
-2. Copy `.adds/ai/start_ai_selection.sh` to `KOBOeReader/.adds/ai/`
-3. Copy `.adds/bin/curl` to `KOBOeReader/.adds/bin/`
-4. Copy `.adds/certs/cacert.pem` to `KOBOeReader/.adds/certs/`
-5. Copy `.adds/nm/config` to `KOBOeReader/.adds/nm/`
+1. Copy `.adds/ai/ask_ai.sh` to `KOBOeReader/.adds/ai/`
+2. Copy `.adds/ai/ask_ai_selection.sh` to `KOBOeReader/.adds/ai/`
+3. Copy `.adds/ai/start_ai_selection.sh` to `KOBOeReader/.adds/ai/`
+4. Copy `.adds/ai/prompt_template.tmpl` to `KOBOeReader/.adds/ai/`
+5. Copy `.adds/bin/curl` to `KOBOeReader/.adds/bin/`
+6. Copy `.adds/certs/cacert.pem` to `KOBOeReader/.adds/certs/`
+7. Copy `.adds/nm/config` to `KOBOeReader/.adds/nm/`
 
 If you already have a NickelMenu config:
 
@@ -161,7 +172,7 @@ Start from this template:
 ```sh
 OPENAI_API_KEY="sk-your-api-key-here"
 OPENAI_MODEL="gpt-4.1-mini"
-PROMPT_TEMPLATE="/mnt/onboard/.adds/ai/prompt_template.txt"
+PROMPT_TEMPLATE="/mnt/onboard/.adds/ai/prompt_template.tmpl"
 ```
 
 You can copy `config.env.example` and rename it to `config.env`, then replace the placeholder key.
@@ -170,7 +181,7 @@ You can copy `config.env.example` and rename it to `config.env`, then replace th
 
 The explanation prompt now lives outside the shell script in:
 
-- `KOBOeReader/.adds/ai/prompt_template.txt`
+- `KOBOeReader/.adds/ai/prompt_template.tmpl`
 
 The selected passage is injected where the template contains:
 
@@ -185,7 +196,7 @@ You can customize the behavior by editing that template file directly.
 The main script also accepts an optional second parameter for a custom prompt-template path, and `config.env` may define:
 
 ```sh
-PROMPT_TEMPLATE="/mnt/onboard/.adds/ai/prompt_template.txt"
+PROMPT_TEMPLATE="/mnt/onboard/.adds/ai/prompt_template.tmpl"
 ```
 
 If `PROMPT_TEMPLATE` is set, the script will use that path by default.
@@ -222,24 +233,28 @@ The current prompt is tuned to act like a teacher:
 
 If you want to tune the behavior, edit:
 
-- `.adds/ai/ask_ai_selection.sh`
+- `.adds/ai/prompt_template.tmpl`
 
-Look for the prompt block assigned to `selection_prompt.txt`.
+The selected passage is inserted where the template contains `{{SELECTED_TEXT}}`.
 
 ## Where Output And Logs Go
 
-Visible answer page:
+Answer page:
 
-- `/mnt/onboard/ai_answers/latest_ai_answer.html`
+- `/mnt/onboard/.adds/ai/output/latest_ai_answer.html`
+
+Database test output:
+
+- `/mnt/onboard/.adds/ai/output/latest_highlight.log`
 
 Hidden log file:
 
-- `/mnt/onboard/.adds/ai/logs/ai_activity_log.txt`
+- `/mnt/onboard/.adds/ai/logs/ai_activity.log`
 
-Why logs are hidden:
+Why these files stay under `.adds`:
 
-- files in `ai_answers/` may appear as books in the Kobo library
-- logs are kept under `.adds` to avoid polluting the book list
+- Kobo may index supported text files from normal user storage into `My Books`
+- keeping output and logs under `.adds` avoids polluting the book list
 
 ## Technical Notes
 
@@ -259,7 +274,7 @@ If `Ask LLM` does not appear:
 
 If the page opens but no answer appears:
 
-- inspect `/mnt/onboard/.adds/ai/logs/ai_activity_log.txt`
+- inspect `/mnt/onboard/.adds/ai/logs/ai_activity.log`
 
 If HTTPS fails:
 
