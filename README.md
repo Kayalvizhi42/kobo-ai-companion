@@ -7,8 +7,9 @@ The current workflow:
 - Select text inside a book on Kobo.
 - Tap `Ask LLM` from the selection menu.
 - Kobo opens a local HTML page immediately.
-- While the request runs, the page shows live status updates.
-- When the response is ready, the same page refreshes into a formatted answer view.
+- A SQLite-backed request is queued and processed in the background.
+- While the request runs, a request-specific page shows live status updates.
+- When the response is ready, that page refreshes into a formatted answer view.
 
 The answer page is designed for on-device reading:
 
@@ -39,13 +40,17 @@ This repository mirrors the files that live on the Kobo:
 ```text
 .adds/
   ai/
-    ask_ai.sh
-    ask_ai_selection.sh
-    start_ai_selection.sh
+    debug_latest_highlight.sh
+    ai_request_lib.sh
+    submit_explanation_request.sh
+    open_explanation_request.sh
+    process_request_queue_item.sh
+    render_request_page.sh
     config.env.example
     prompt_template.tmpl
   bin/
     curl
+    sqlite3
   certs/
     cacert.pem
   nm/
@@ -54,18 +59,26 @@ This repository mirrors the files that live on the Kobo:
 
 What each file does:
 
-- `.adds/ai/ask_ai.sh`
+- `.adds/ai/debug_latest_highlight.sh`
   Small database test helper that writes the latest highlight text to a log file under `.adds/ai/output/`.
-- `.adds/ai/ask_ai_selection.sh`
-  Main script. Builds the prompt, calls OpenAI, logs activity, and writes the final HTML answer.
-- `.adds/ai/start_ai_selection.sh`
+- `.adds/ai/ai_request_lib.sh`
+  Shared shell helpers for SQLite access, prompt seeding, hashing, and HTML rendering.
+- `.adds/ai/submit_explanation_request.sh`
+  Request submitter. Seeds the prompt library, creates or reuses a request, and launches the worker and watcher.
+- `.adds/ai/open_explanation_request.sh`
   Small wrapper that creates the loading page first, then launches the background AI request.
+- `.adds/ai/process_request_queue_item.sh`
+  Background worker that claims a queued request, calls OpenAI, and stores the response in SQLite.
+- `.adds/ai/render_request_page.sh`
+  Background poller that keeps rewriting the request page until the request becomes `complete` or `error`.
 - `.adds/ai/config.env.example`
   Template for your API key and model selection.
 - `.adds/ai/prompt_template.tmpl`
-  Editable prompt template used to shape the explanation.
+  Editable default prompt template used to seed the prompt library.
 - `.adds/bin/curl`
   Bundled static ARM `curl` binary used by Kobo.
+- `.adds/bin/sqlite3`
+  Bundled `sqlite3` binary used by the request queue and debug helper when Kobo does not provide one.
 - `.adds/certs/cacert.pem`
   CA bundle so `curl` can validate HTTPS to `api.openai.com`.
 - `.adds/nm/config`
@@ -78,6 +91,7 @@ You need:
 - a Kobo device
 - NickelMenu installed
 - an OpenAI API key
+- a working `sqlite3` binary on the Kobo, either system-provided or copied to `.adds/bin/sqlite3`
 - USB access to copy files to the Kobo storage
 
 ## 1. Install NickelMenu
@@ -136,25 +150,33 @@ The root of the mounted device is typically something like:
 Copy this repo’s `.adds` contents onto the Kobo so the device ends up with:
 
 ```text
-/mnt/onboard/.adds/ai/ask_ai.sh
-/mnt/onboard/.adds/ai/ask_ai_selection.sh
-/mnt/onboard/.adds/ai/start_ai_selection.sh
+/mnt/onboard/.adds/ai/debug_latest_highlight.sh
+/mnt/onboard/.adds/ai/ai_request_lib.sh
+/mnt/onboard/.adds/ai/submit_explanation_request.sh
+/mnt/onboard/.adds/ai/open_explanation_request.sh
+/mnt/onboard/.adds/ai/process_request_queue_item.sh
+/mnt/onboard/.adds/ai/render_request_page.sh
 /mnt/onboard/.adds/ai/prompt_template.tmpl
 /mnt/onboard/.adds/ai/config.env
 /mnt/onboard/.adds/bin/curl
+/mnt/onboard/.adds/bin/sqlite3
 /mnt/onboard/.adds/certs/cacert.pem
 /mnt/onboard/.adds/nm/config
 ```
 
 Practical copy steps:
 
-1. Copy `.adds/ai/ask_ai.sh` to `KOBOeReader/.adds/ai/`
-2. Copy `.adds/ai/ask_ai_selection.sh` to `KOBOeReader/.adds/ai/`
-3. Copy `.adds/ai/start_ai_selection.sh` to `KOBOeReader/.adds/ai/`
-4. Copy `.adds/ai/prompt_template.tmpl` to `KOBOeReader/.adds/ai/`
-5. Copy `.adds/bin/curl` to `KOBOeReader/.adds/bin/`
-6. Copy `.adds/certs/cacert.pem` to `KOBOeReader/.adds/certs/`
-7. Copy `.adds/nm/config` to `KOBOeReader/.adds/nm/`
+1. Copy `.adds/ai/debug_latest_highlight.sh` to `KOBOeReader/.adds/ai/`
+2. Copy `.adds/ai/ai_request_lib.sh` to `KOBOeReader/.adds/ai/`
+3. Copy `.adds/ai/submit_explanation_request.sh` to `KOBOeReader/.adds/ai/`
+4. Copy `.adds/ai/open_explanation_request.sh` to `KOBOeReader/.adds/ai/`
+5. Copy `.adds/ai/process_request_queue_item.sh` to `KOBOeReader/.adds/ai/`
+6. Copy `.adds/ai/render_request_page.sh` to `KOBOeReader/.adds/ai/`
+7. Copy `.adds/ai/prompt_template.tmpl` to `KOBOeReader/.adds/ai/`
+8. Copy `.adds/bin/curl` to `KOBOeReader/.adds/bin/`
+9. Copy `.adds/bin/sqlite3` to `KOBOeReader/.adds/bin/` unless your Kobo already has a working `sqlite3`
+10. Copy `.adds/certs/cacert.pem` to `KOBOeReader/.adds/certs/`
+11. Copy `.adds/nm/config` to `KOBOeReader/.adds/nm/`
 
 If you already have a NickelMenu config:
 
@@ -191,15 +213,15 @@ The selected passage is injected where the template contains:
 
 For the current shell implementation, keep `{{SELECTED_TEXT}}` on its own line for the most reliable rendering.
 
-You can customize the behavior by editing that template file directly.
+You can customize the behavior by editing that template file directly. On the next request, the script seeds the `prompt_library` table from that file and the `explain_selection` request type points at the updated template.
 
-The main script also accepts an optional second parameter for a custom prompt-template path, and `config.env` may define:
+`config.env` may define:
 
 ```sh
 PROMPT_TEMPLATE="/mnt/onboard/.adds/ai/prompt_template.tmpl"
 ```
 
-If `PROMPT_TEMPLATE` is set, the script will use that path by default.
+If `PROMPT_TEMPLATE` is set, the seeding step will use that path by default.
 
 ## 5. Eject And Let Kobo Reload
 
@@ -242,6 +264,7 @@ The selected passage is inserted where the template contains `{{SELECTED_TEXT}}`
 Answer page:
 
 - `/mnt/onboard/.adds/ai/output/latest_ai_answer.html`
+- `/mnt/onboard/.adds/ai/output/request_<id>.html`
 
 Database test output:
 
@@ -251,6 +274,16 @@ Hidden log file:
 
 - `/mnt/onboard/.adds/ai/logs/ai_activity.log`
 
+SQLite request database:
+
+- `/mnt/onboard/.adds/ai/requests.db`
+
+Runtime tables:
+
+- `prompt_library`
+- `request_types`
+- `requests`
+
 Why these files stay under `.adds`:
 
 - Kobo may index supported text files from normal user storage into `My Books`
@@ -259,8 +292,11 @@ Why these files stay under `.adds`:
 ## Technical Notes
 
 - The Kobo environment used here did not provide a working `curl`, so this repo includes a bundled static ARM `curl`.
+- The SQLite-backed request flow depends on `sqlite3`. The scripts first look for `/mnt/onboard/.adds/bin/sqlite3`, then fall back to a system `sqlite3` if the device already has one.
 - The Kobo environment also needed a CA bundle for HTTPS verification, so `cacert.pem` is included.
-- The script does not rely on `python3` being installed on the Kobo.
+- The request flow is now database-backed, so prompt templates, request types, request state, responses, and cache hits live in SQLite instead of shared temp files.
+- The script does not rely on `python3` being installed on the Kobo, though it will use it when available for safer JSON handling.
+- The immediate UI is still a local browser modal page. This repo does not yet implement a native Kobo popup window.
 - The OpenAI call uses the Responses API endpoint:
   `https://api.openai.com/v1/responses`
 
@@ -275,11 +311,16 @@ If `Ask LLM` does not appear:
 If the page opens but no answer appears:
 
 - inspect `/mnt/onboard/.adds/ai/logs/ai_activity.log`
+- inspect `/mnt/onboard/.adds/ai/requests.db` for stuck `queued` or `processing` rows
 
 If HTTPS fails:
 
 - verify `.adds/bin/curl` exists
 - verify `.adds/certs/cacert.pem` exists
+
+If request submission fails immediately:
+
+- verify `.adds/bin/sqlite3` exists, or verify the Kobo already has a working `sqlite3`
 
 If API calls fail:
 
