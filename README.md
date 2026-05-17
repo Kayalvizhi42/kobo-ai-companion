@@ -22,12 +22,12 @@ Selection and launch flow:
 
 <img src="images/screen_004.png" alt="Ask AI menu action on Kobo" width="420" />
 
-Generated answer view:
+Loading and generated answer view:
 
 <table>
   <tr>
-    <td><img src="images/screen_005.png" alt="Formatted AI answer on Kobo" width="320" /></td>
-    <td><img src="images/screen_002.png" alt="Long-form explanation view on Kobo" width="320" /></td>
+    <td><img src="images/screen_001.png" alt="Ask AI loading state on Kobo" width="320" /></td>
+    <td><img src="images/screen_003.png" alt="Expanded Ask AI answer on Kobo" width="320" /></td>
   </tr>
 </table>
 
