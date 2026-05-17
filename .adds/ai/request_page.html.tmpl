@@ -1,19 +1,14 @@
 <html><head><meta charset='utf-8'>
 {{REFRESH_LINE}}
-<title>Kobo AI Answer</title>
+<title>Ask AI</title>
 <style>
 {{PAGE_CSS}}
 </style></head><body>
-<h1>AI Answer</h1>
+<h1>Ask AI</h1>
 <div class='label'>{{REQUEST_META}}</div>
-<div class='card'>
-<h2>Status</h2>
-<pre>{{STATUS_LABEL}}</pre>
-<pre>{{STATUS_BODY}}</pre>
-</div>
-<div class='card'>
-<h2>Selected Text</h2>
-<pre>{{SELECTION_HTML}}</pre>
-</div>
 {{RESULT_CARD_BLOCK}}
+<details class='card collapsible'>
+<summary><span class='summary-arrow'>▾</span><span class='summary-title'>Selected Text</span></summary>
+<pre>{{SELECTION_HTML}}</pre>
+</details>
 </body></html>

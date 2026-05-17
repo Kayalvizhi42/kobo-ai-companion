@@ -206,6 +206,9 @@ tempCodeRunnerFile.py
 # macOS
 .DS_Store
 
+# Local Kobo device backups
+device-backups/
+
 # Ruff stuff:
 .ruff_cache/
 
