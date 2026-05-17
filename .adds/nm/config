@@ -1,4 +1,5 @@
 menu_item :main    :Test NickelMenu    :dbg_toast    :NickelMenu works
 menu_item :main    :Ask AI Test    :cmd_spawn    :quiet:/mnt/onboard/.adds/ai/debug_latest_highlight.sh
-menu_item :selection    :Ask LLM    :cmd_spawn    :quiet:/mnt/onboard/.adds/ai/open_explanation_request.sh '{1||$}'
+menu_item :main    :Screenshots On/Off    :nickel_setting    :toggle :screenshots
+menu_item :selection    :Ask AI    :cmd_spawn    :quiet:/mnt/onboard/.adds/ai/open_explanation_request_lua.sh '{1||$}'
   chain_success    :nickel_browser    :modal:file:///mnt/onboard/.adds/ai/output/latest_ai_answer.html
